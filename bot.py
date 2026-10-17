@@ -1,34 +1,32 @@
 import asyncio
-import os
-import logging
-from deriv_sdk import DerivClient
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-APP_ID = "1089"
-TOKEN = os.environ.get("DERIV_DEMO_TOKEN")
-SYMBOL = "R_100"
+import websockets
+import json
 
 async def main():
-    if not TOKEN:
-        logging.error("DERIV_DEMO_TOKEN environment variable is not set.")
-        return
+    # The correct public endpoint for market data
+    url = "wss://api.derivws.com/trading/v1/options/ws/public"
 
     while True:
         try:
-            client = DerivClient(app_id=APP_ID, api_token=TOKEN)
-            await client.start()
-            logging.info("Authorization successful.")
-
-            logging.info(f"Subscribing to {SYMBOL} ticks...")
-            subscription = await client.market.subscribe_ticks(SYMBOL)
-            
-            async for tick in subscription:
-                logging.info(f"[TICK] {tick.symbol} = {tick.quote}")
+            print("Connecting to Deriv...")
+            async with websockets.connect(url) as websocket:
+                print("Connection established!")
                 
+                # Subscribe to R_100 ticks
+                subscribe_msg = {"ticks": "R_100", "subscribe": 1}
+                await websocket.send(json.dumps(subscribe_msg))
+                print("Subscription sent. Waiting for ticks...")
+
+                # Keep listening for messages
+                async for message in websocket:
+                    data = json.loads(message)
+                    if 'tick' in data:
+                        quote = data['tick']['quote']
+                        print(f"[TICK] R_100 = {quote}")
+
         except Exception as e:
-            logging.error(f"Connection error: {e}")
-            logging.info("Reconnecting in 5 seconds...")
+            print(f"Connection error: {e}")
+            print("Reconnecting in 5 seconds...")
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
