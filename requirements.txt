@@ -1,1 +1,2 @@
-deriv-sdk
+websockets
+aiohttp
