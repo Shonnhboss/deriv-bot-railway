@@ -1,0 +1,1 @@
+- [Python package installs](python-package-installs.md) — base Python modules may be immutable; use a Python Tools module for managed pip installs.
