@@ -7,11 +7,16 @@ import aiohttp
 
 TOKEN = os.environ.get("DERIV_DEMO_TOKEN")
 BASE_REST_URL = "https://api.derivws.com"
+APP_ID = "1089"
 
 async def get_otp_and_account(session):
     """Fetches the demo account ID and a new OTP."""
     # 1. Get the list of accounts to find the demo account ID
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    # FIX: Added Deriv-App-ID header required for PAT authentication
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Deriv-App-ID": APP_ID
+    }
     async with session.get(f"{BASE_REST_URL}/trading/v1/options/accounts", headers=headers) as resp:
         if resp.status != 200:
             print(f"Failed to get accounts: {await resp.text()}")
