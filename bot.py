@@ -7,7 +7,7 @@ import aiohttp
 
 TOKEN = os.environ.get("DERIV_DEMO_TOKEN")
 BASE_REST_URL = "https://api.derivws.com"
-APP_ID = "1089"
+APP_ID = "34HCo5T1SjPMNFOhLc5w"
 
 async def get_otp_and_account(session):
     """Fetches the demo account ID and a new OTP."""
