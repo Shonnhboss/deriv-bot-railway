@@ -10,34 +10,42 @@ BASE_REST_URL = "https://api.derivws.com"
 APP_ID = "34HCo5T1SjPMNFOhLc5w"
 
 async def get_otp_and_account(session):
-    """Fetches the demo account ID and a new OTP."""
-    # 1. Get the list of accounts to find the demo account ID
-    # FIX: Added Deriv-App-ID header required for PAT authentication
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Deriv-App-ID": APP_ID
     }
+    
+    # 1. Get accounts
     async with session.get(f"{BASE_REST_URL}/trading/v1/options/accounts", headers=headers) as resp:
         if resp.status != 200:
-            print(f"Failed to get accounts: {await resp.text()}")
+            print(f"❌ Failed to get accounts ({resp.status}): {await resp.text()}")
             return None, None
         accounts_data = await resp.json()
+        
         demo_account_id = None
         for acc in accounts_data.get('data', []):
             if acc.get('account_type') == 'demo':
                 demo_account_id = acc.get('account_id')
                 break
+        
         if not demo_account_id:
-            print("No demo account found.")
+            print(f"❌ No demo account found. Full response: {accounts_data}")
             return None, None
 
-    # 2. Request an OTP for the demo account
+    # 2. Request OTP
+    print(f"Found demo account: {demo_account_id}. Requesting OTP...")
     async with session.post(f"{BASE_REST_URL}/trading/v1/options/accounts/{demo_account_id}/otp", headers=headers) as resp:
         if resp.status != 200:
-            print(f"Failed to get OTP: {await resp.text()}")
+            print(f"❌ Failed to get OTP ({resp.status}): {await resp.text()}")
             return None, None
         otp_data = await resp.json()
-        return demo_account_id, otp_data.get('otp')
+        
+        # Debug: Print the full OTP response
+        print(f"OTP Response from Deriv: {otp_data}")
+        
+        # The URL might be under 'data' or 'otp' depending on the API version
+        ws_url = otp_data.get('data', {}).get('url') or otp_data.get('url')
+        return demo_account_id, ws_url
 
 async def main():
     if not TOKEN:
@@ -47,24 +55,18 @@ async def main():
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                print("Requesting OTP...")
-                account_id, otp = await get_otp_and_account(session)
-                if not otp:
-                    print("Failed to get OTP. Retrying in 10s...")
+                account_id, otp_url = await get_otp_and_account(session)
+                if not otp_url:
+                    print("Failed to extract OTP URL. Retrying in 10s...")
                     await asyncio.sleep(10)
                     continue
 
-                print(f"Got OTP. Connecting to demo WebSocket...")
-                ws_url = f"wss://api.derivws.com/trading/v1/options/ws/demo?otp={otp}"
-                
-                async with websockets.connect(ws_url) as websocket:
-                    print("Connected to Authenticated Demo Endpoint!")
-                    
-                    # Subscribe to ticks
+                print(f"Connecting to demo WebSocket...")
+                async with websockets.connect(otp_url) as websocket:
+                    print("✅ Connected to Authenticated Demo Endpoint!")
                     await websocket.send(json.dumps({"ticks": "R_100", "subscribe": 1}))
 
-                    # Trading Loop
-                    last_trade_time = time.time() - 60  # Force a trade on the first tick
+                    last_trade_time = time.time() - 60
                     
                     async for message in websocket:
                         msg = json.loads(message)
